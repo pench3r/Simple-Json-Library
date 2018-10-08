@@ -48,15 +48,13 @@ SIMPLEJ_TYPE get_simplejson_type(const SIMPLEJ_VALUE *sj_value);
 
 SIMPLEJ_PARSE_RESULT simplejson_parse_value(SIMPLEJ_VALUE *sj_value, const char *str);
 
-SIMPLEJ_PARSE_RESULT simplejson_parse_null(SIMPLEJ_VALUE *sj_value, const char *str);
-
-SIMPLEJ_PARSE_RESULT simplejson_parse_true(SIMPLEJ_VALUE *sj_value, const char *str);
-
-SIMPLEJ_PARSE_RESULT simplejson_parse_false(SIMPLEJ_VALUE *sj_value, const char *str);
+SIMPLEJ_PARSE_RESULT simplejson_parse_literal(SIMPLEJ_VALUE *sj_value, const char *str, const char *except, SIMPLEJ_TYPE type);
 
 /* this argument can use some struct to store user input str address that easy to update input str */
 void strip_space(const char **input_str);
 
-int is_except_str(const char *input_str, char *except_str);
+int is_except_str(const char *input_str, const char *except_str);
+
+int is_single_word(const char *input_str);
 
 #endif /* SIMPLEJSON_H__ */
