@@ -4,8 +4,8 @@
 #include <stdlib.h> /* strtod */
 
 
-#define IS_DIGIT1_9(ch) (((ch)>=1) && ((ch)<=9))
-#define IS_DIGIT(ch) (((ch)>=0) && ((ch)<=9))
+#define IS_DIGIT1_9(ch) (((ch)>='1') && ((ch)<='9'))
+#define IS_DIGIT(ch) (((ch)>='0') && ((ch)<='9'))
 
 
 const char *sj_parse_str[4] = {
@@ -44,7 +44,6 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, const char
 	if (*str == '-')
 		str++;
 
-	printf("second part");
 	/* parse second part */
 	if (*str == '0') {
 		str++;
@@ -53,12 +52,11 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, const char
 			str++;
 			while(IS_DIGIT(*str))
 				str++;
-		}	else {
+		} else {
 			return SIMPLEJ_PARSE_INVALID_VALUE;
 		}
 	}
 
-	printf("third part");
 	/* parse third part */
 	if (*str == '.' && IS_DIGIT(*(str+1))) {
 		str = str+2;	
@@ -78,7 +76,6 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, const char
 		}	
 	}
 	
-	printf("pstr is %p; endPTr is %p", str, endPtr);
 	/* last parse */
 	if (str == endPtr ) {
 		sj_value->number = tmp_number;

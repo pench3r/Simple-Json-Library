@@ -9,10 +9,17 @@ static int testPassNum = 0;
 		if (expect == actual) {\
 			testPassNum++;\
 		} else {\
-			if (check_type == 0) {\
-				fprintf(stderr, "%s:%d: expect: %s, actual: %s.\n", __FILE__, __LINE__, sj_parse_str[expect], sj_parse_str[actual]);\
-			} else {\
-				fprintf(stderr, "%s:%d: expect: %s, actual: %s.\n", __FILE__, __LINE__, sj_type_str[expect], sj_type_str[actual]);\
+			switch(check_type) {\
+				case SIMPLEJ_PARSE_ERROR_STR:\
+					fprintf(stderr, "%s:%d: expect: %s, actual: %s.\n", __FILE__, __LINE__, sj_parse_str[expect], sj_parse_str[actual]);\
+					break;\
+				case SIMPLEJ_TYPE_ERROR_STR:\
+					fprintf(stderr, "%s:%d: expect: %s, actual: %s.\n", __FILE__, __LINE__, sj_type_str[expect], sj_type_str[actual]);\
+					break;\
+				case SIMPLEJ_NUMBER_ERROR_STR:\
+					fprintf(stderr, "%s:%d: expect: %f, actual: %f.\n", __FILE__, __LINE__, expect, actual);\
+				default:\
+					fprintf(stderr, "%s:%d: expect: %d, actual: %d.\n", __FILE__, __LINE__, expect, actual);\
 			}\
 		}\
 	} while(0)
@@ -25,8 +32,36 @@ static int testPassNum = 0;
 		CHECK_FOR_EQUAL(expect_type, get_simplejson_type(&sj_value), SIMPLEJ_TYPE_ERROR_STR);\
 	} while(0)
 
+#define CHECK_NUMBER(expect, json) \
+	do {\
+		SIMPLEJ_VALUE sj_value;\
+		sj_value.sj_type = SIMPLEJ_NULL;\
+		CHECK_FOR_EQUAL(SIMPLEJ_PARSE_OK, simplejson_parse(&sj_value,json), SIMPLEJ_PARSE_ERROR_STR);\
+		CHECK_FOR_EQUAL(SIMPLEJ_NUMBER, get_simplejson_type(&sj_value), SIMPLEJ_TYPE_ERROR_STR);\
+		CHECK_FOR_EQUAL(expect, get_simplejson_number(&sj_value), SIMPLEJ_NUMBER_ERROR_STR);\
+	} while(0)
+
 static void test_parse_number() {
+#if 0
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "0");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "-0");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "-0.0");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "1");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "1.5");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "-1");
 	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "-1.23");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "3.1416");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "1E+10");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "1E-10");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "-1E10");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "-1e10");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "-1E+10");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "-1E-10");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "1.234E+10");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "1.234E-10");
+	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NUMBER, "1e-10000");
+#endif
+	CHECK_NUMBER(0.0, "0");
 }
 
 #if 0

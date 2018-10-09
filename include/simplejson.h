@@ -14,7 +14,8 @@ typedef enum {
 /* error str type */
 typedef enum {
 	SIMPLEJ_PARSE_ERROR_STR = 0,
-	SIMPLEJ_TYPE_ERROR_STR
+	SIMPLEJ_TYPE_ERROR_STR,
+	SIMPLEJ_NUMBER_ERROR_STR
 } SIMPLEJ_ERROR_STR;
 
 /* json type */
