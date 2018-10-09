@@ -30,6 +30,7 @@ typedef enum {
 
 /* basic parse node struct */
 typedef struct {
+	double number;
 	SIMPLEJ_TYPE sj_type;
 } SIMPLEJ_VALUE;
 
@@ -46,9 +47,14 @@ SIMPLEJ_PARSE_RESULT simplejson_parse(SIMPLEJ_VALUE *sj_value, const char *str);
 /* get value type */
 SIMPLEJ_TYPE get_simplejson_type(const SIMPLEJ_VALUE *sj_value);
 
+/* get number */
+double get_simplejson_number(const SIMPLEJ_VALUE *sj_value);
+
 SIMPLEJ_PARSE_RESULT simplejson_parse_value(SIMPLEJ_VALUE *sj_value, const char *str);
 
 SIMPLEJ_PARSE_RESULT simplejson_parse_literal(SIMPLEJ_VALUE *sj_value, const char *str, const char *except, SIMPLEJ_TYPE type);
+
+SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, const char *str);
 
 /* this argument can use some struct to store user input str address that easy to update input str */
 void strip_space(const char **input_str);
