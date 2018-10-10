@@ -1,6 +1,6 @@
 # Simple-Json-Library
 
-主要通过[https://github.com/miloyip/json-tutorial](https://github.com/miloyip/json-tutorial)教程进行开发的
+主要通过[https://github.com/miloyip/json-tutorial](https://github.com/miloyip/json-tutorial)中的文档进行指引开发的
 
 ### 目标：
 
