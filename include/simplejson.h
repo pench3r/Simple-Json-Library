@@ -8,7 +8,8 @@ typedef enum {
 	SIMPLEJ_PARSE_OK = 0,
 	SIMPLEJ_PARSE_EXPECT_VALUE,
 	SIMPLEJ_PARSE_INVALID_VALUE,
-	SIMPLEJ_PARSE_ROOT_NOT_SINGULAR
+	SIMPLEJ_PARSE_ROOT_NOT_SINGULAR,
+	SIMPLEJ_PARSE_NUMBER_TOO_BIG
 } SIMPLEJ_PARSE_RESULT;
 
 /* error str type */
@@ -35,7 +36,7 @@ typedef struct {
 	SIMPLEJ_TYPE sj_type;
 } SIMPLEJ_VALUE;
 
-const char *sj_parse_str[4];
+const char *sj_parse_str[5];
 const char *sj_type_str[7];
 
 /* parse function

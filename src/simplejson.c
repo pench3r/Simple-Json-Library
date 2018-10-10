@@ -2,15 +2,18 @@
 #include <string.h>
 #include <assert.h> /* assert */
 #include <stdlib.h> /* strtod */
+#include <math.h> /* HUGE_VAL */
+#include <errno.h> /* errno */
 
 
 #define IS_DIGIT1_9(ch) (((ch)>='1') && ((ch)<='9'))
 #define IS_DIGIT(ch) (((ch)>='0') && ((ch)<='9'))
 
 
-const char *sj_parse_str[4] = {
+const char *sj_parse_str[5] = {
   "SIMPLEJ_PARSE_OK", "SIMPLEJ_PARSE_EXPECT_VALUE",
-  "SIMPLEJ_PARSE_INVALID_VALUE", "SIMPLEJ_PARSE_ROOT_NOT_SINGULAR"
+  "SIMPLEJ_PARSE_INVALID_VALUE", "SIMPLEJ_PARSE_ROOT_NOT_SINGULAR",
+	"SIMPLEJ_PARSE_NUMBER_TOO_BIG"
 };
 
 const char *sj_type_str[7] = {
@@ -38,8 +41,11 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_literal(SIMPLEJ_VALUE *sj_value, const cha
 }
 
 SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, const char *str) {
+	double tmp_number = 0.0;
 	char *endPtr;
-	double tmp_number = strtod(str, &endPtr);
+	errno = 0;
+	tmp_number = strtod(str, &endPtr);
+	if ((tmp_number == HUGE_VAL || tmp_number == -HUGE_VAL) && errno == ERANGE) return SIMPLEJ_PARSE_NUMBER_TOO_BIG;
 	/* parse first part */
 	if (*str == '-')
 		str++;
@@ -48,18 +54,17 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, const char
 	if (*str == '0') {
 		str++;
 	} else {
-		if (IS_DIGIT1_9(*str)) {
+		if (!IS_DIGIT1_9(*str)) return SIMPLEJ_PARSE_INVALID_VALUE;
+		str++;
+		while(IS_DIGIT(*str))
 			str++;
-			while(IS_DIGIT(*str))
-				str++;
-		} else {
-			return SIMPLEJ_PARSE_INVALID_VALUE;
-		}
 	}
 
 	/* parse third part */
-	if (*str == '.' && IS_DIGIT(*(str+1))) {
-		str = str+2;	
+	if (*str == '.') {
+		str++;
+		if (!IS_DIGIT(*str)) return SIMPLEJ_PARSE_INVALID_VALUE;
+		str++;	
 		while(IS_DIGIT(*str))
 			str++;
 	}
@@ -69,11 +74,10 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, const char
 		str++;
 		if (*str == '-' || *str == '+')
 			str++;
-		if (IS_DIGIT(*str)) {
+		if (!IS_DIGIT(*str)) return SIMPLEJ_PARSE_INVALID_VALUE;
+		str++;	
+		while(IS_DIGIT(*str))
 			str++;
-			while(IS_DIGIT(*str))
-				str++;
-		}	
 	}
 	
 	/* last parse */
@@ -113,7 +117,7 @@ void strip_space(const char **input_str) {
 
 int is_except_str(const char *input_str,const char *except_str) {
 	int except_len = strlen(except_str);
-	int index;
+	size_t index;
 	for (index = 0; index < except_len; index++) {
 		if (input_str[index] != except_str[index])
 			return 0;	
