@@ -32,9 +32,17 @@ typedef enum {
 
 /* basic parse node struct */
 typedef struct {
-	double number;
+	union {
+		struct {char* s; size_t len;}s;	/* string */
+		double number;	/* number */
+	}u;
 	SIMPLEJ_TYPE sj_type;
 } SIMPLEJ_VALUE;
+
+/* basic parse context struct */
+typedef struct {
+	const char * json;
+} SIMPLEJ_CONTEXT;
 
 const char *sj_parse_str[5];
 const char *sj_type_str[7];
@@ -52,17 +60,20 @@ SIMPLEJ_TYPE get_simplejson_type(const SIMPLEJ_VALUE *sj_value);
 /* get number */
 double get_simplejson_number(const SIMPLEJ_VALUE *sj_value);
 
-SIMPLEJ_PARSE_RESULT simplejson_parse_value(SIMPLEJ_VALUE *sj_value, const char *str);
+/* get string */
+const char * get_simplejson_string(const SIMPLEJ_VALUE *sj_value);
 
-SIMPLEJ_PARSE_RESULT simplejson_parse_literal(SIMPLEJ_VALUE *sj_value, const char *str, const char *except, SIMPLEJ_TYPE type);
+SIMPLEJ_PARSE_RESULT simplejson_parse_value(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context);
 
-SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, const char *str);
+SIMPLEJ_PARSE_RESULT simplejson_parse_literal(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context, const char *except, SIMPLEJ_TYPE type);
+
+SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context);
+
+SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, const char *str);
 
 /* this argument can use some struct to store user input str address that easy to update input str */
-void strip_space(const char **input_str);
+void strip_space(SIMPLEJ_CONTEXT *sj_context);
 
 int is_except_str(const char *input_str, const char *except_str);
-
-int is_single_word(const char *input_str);
 
 #endif /* SIMPLEJSON_H__ */
