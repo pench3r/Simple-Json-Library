@@ -1,12 +1,15 @@
 #include "simplejson.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 static int testTotalNum = 0;
 static int testPassNum = 0;
 
-#define CHECK_FOR_EQUAL(expect, actual, check_type) \
+#define CHECK_FOR_EQUAL(equality, expect, actual, check_type) \
 	do {\
 		testTotalNum++;\
-		if (expect == actual) {\
+		if (equality) {\
 			testPassNum++;\
 		} else {\
 			if (check_type == SIMPLEJ_PARSE_ERROR_STR) {\
@@ -21,22 +24,50 @@ static int testPassNum = 0;
 		}\
 	} while(0)
 
+#define EXPECT_EQ_BASE(equality, expect, actual, format) \
+	do {\
+		testTotalNum++;\
+		if (equality) {\
+			testPassNum++;\
+		} else {\
+			fprintf(stderr, "%s:%d: expect:" format " actual: " format "\n", __FILE__, __LINE__, expect, actual);\
+		}\
+	} while(0) 
+	
+#define EXPECT_EQ_INT(expect, actual) EXPECT_EQ_BASE((expect)==(actual), expect, actual, "%d")
+#define EXPECT_EQ_DOUBLE(expect, actual) EXPECT_EQ_BASE((expect)==(actual), expect, actual, "%g")
+#define EXPECT_EQ_STRING(expect, actual, len) \
+	EXPECT_EQ_BASE(sizeof(expect) -1 == len && memcmp(expect, actual, len) == 0, expect, actual, "%s")
+
 #define CHECK_ERROR(expect_parse, expect_type, json) \
 	do {\
 		SIMPLEJ_VALUE sj_value;\
 		sj_value.sj_type = SIMPLEJ_NULL;\
-		CHECK_FOR_EQUAL(expect_parse, simplejson_parse(&sj_value,json), SIMPLEJ_PARSE_ERROR_STR);\
-		CHECK_FOR_EQUAL(expect_type, get_simplejson_type(&sj_value), SIMPLEJ_TYPE_ERROR_STR);\
+		EXPECT_EQ_INT(expect_parse, simplejson_parse(&sj_value, json));\
+		EXPECT_EQ_INT(expect_type, get_simplejson_type(&sj_value));\
 	} while(0)
 
 #define CHECK_NUMBER(expect, json) \
 	do {\
 		SIMPLEJ_VALUE sj_value;\
 		sj_value.sj_type = SIMPLEJ_NULL;\
-		CHECK_FOR_EQUAL(SIMPLEJ_PARSE_OK, simplejson_parse(&sj_value,json), SIMPLEJ_PARSE_ERROR_STR);\
-		CHECK_FOR_EQUAL(SIMPLEJ_NUMBER, get_simplejson_type(&sj_value), SIMPLEJ_TYPE_ERROR_STR);\
-		CHECK_FOR_EQUAL(expect, get_simplejson_number(&sj_value), SIMPLEJ_NUMBER_ERROR_STR);\
+		EXPECT_EQ_INT(SIMPLEJ_PARSE_OK, simplejson_parse(&sj_value,json));\
+		EXPECT_EQ_INT(SIMPLEJ_NUMBER, get_simplejson_type(&sj_value));\
+		EXPECT_EQ_DOUBLE(expect, get_simplejson_number(&sj_value));\
 	} while(0)
+
+#define CHECK_STRING(expect, json) \
+	do {\
+		SIMPLEJ_VALUE sj_value;\
+		sj_value.sj_type = SIMPLEJ_NULL;\
+		EXPECT_EQ_INT(SIMPLEJ_PARSE_OK, simplejson_parse(&sj_value,json));\
+		EXPECT_EQ_INT(SIMPLEJ_STRING, get_simplejson_type(&sj_value));\
+		EXPECT_EQ_STRING(expect, get_simplejson_string(&sj_value), get_simplejson_string_length(&sj_value));\
+	} while(0)
+
+static void test_parse_string() {
+	CHECK_STRING("hello", "\"hello\"");
+}
 
 static void test_parse_number() {
 #if 0
@@ -131,6 +162,7 @@ static void test_parse_number_too_big() {
 		
 
 static void test_parse() {
+	test_parse_string();
 	test_parse_null();
 	test_parse_false();
 	test_parse_true();
