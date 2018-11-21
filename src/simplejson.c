@@ -16,10 +16,11 @@
 #define PUTC(context, ch) do {*(char *)simplejson_context_push(context, sizeof(char)) = (ch);} while(0)
 
 
-const char *sj_parse_str[6] = {
+const char *sj_parse_str[8] = {
   "SIMPLEJ_PARSE_OK", "SIMPLEJ_PARSE_EXPECT_VALUE",
   "SIMPLEJ_PARSE_INVALID_VALUE", "SIMPLEJ_PARSE_ROOT_NOT_SINGULAR",
-	"SIMPLEJ_PARSE_NUMBER_TOO_BIG", "SIMPLEJ_PARSE_MISS_QUOTATION_MASK"
+	"SIMPLEJ_PARSE_NUMBER_TOO_BIG", "SIMPLEJ_PARSE_MISS_QUOTATION_MASK",
+	"SIMPLEJ_PARSE_INVALID_STRING_ESCAPE", "SIMPLEJ_PARSE_INVALID_STRING_CHAR"
 };
 
 const char *sj_type_str[7] = {
@@ -28,6 +29,8 @@ const char *sj_type_str[7] = {
 	"SIMPLEJ_OBJECT"
 };
 
+/* 函数的主要功能: 返回可用的地址指针(stack + top),用于后续存储数据,并更新top值(代表可用地址的起始值)
+*/
 static void * simplejson_context_push(SIMPLEJ_CONTEXT *sj_context, size_t size) {
 	void * ret;
 	assert(size > 0);
@@ -58,11 +61,19 @@ double get_simplejson_number(const SIMPLEJ_VALUE *sj_value) {
 	return sj_value->u.number;
 }
 
+void set_simplejson_number(SIMPLEJ_VALUE *sj_value, double value) {
+	sj_free(sj_value);
+	sj_value->sj_type = SIMPLEJ_NUMBER;
+	sj_value->u.number = value;	
+}
+
 int get_simplejson_boolean(const SIMPLEJ_VALUE *sj_value) {
+	/* 这里还需要判断类型是否为boolean中的之一 */
 	assert(sj_value != NULL && (sj_value->sj_type == SIMPLEJ_TRUE || sj_value->sj_type == SIMPLEJ_FALSE));	
 	return sj_value->sj_type == SIMPLEJ_TRUE;
 }
 
+/* 函数设置1类型为true,设置0类型为false */
 void set_simplejson_boolean(SIMPLEJ_VALUE *sj_value, int value) {
 	sj_free(sj_value);
 	sj_value->sj_type = value ? SIMPLEJ_TRUE : SIMPLEJ_FALSE;
@@ -93,6 +104,8 @@ void set_simplejson_string(SIMPLEJ_VALUE *sj_value, const char* str, size_t len)
 }
 
 SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context) {
+	/* 保存stack的top信息,用于回滚操作 */
+	size_t head = sj_context->top, len;
 	const char * tmp_str;
 	char current_ch;
 	tmp_str = sj_context->json;
@@ -100,14 +113,60 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CO
 	while (1) {
 		current_ch = *tmp_str++;
 		switch(current_ch) {
+			/* 该分支处理转义字符 */
+			/* \" 为一个字节 */
+			case '\\':
+				current_ch = *tmp_str++;
+				switch(current_ch) {
+					case 'b':
+						PUTC(sj_context, '\b');
+						break;
+					case 'f':
+						PUTC(sj_context, '\f');
+						break;
+					case 'n':
+						PUTC(sj_context, '\n');
+						break;
+					case 'r':
+						PUTC(sj_context, '\r');
+						break;
+					case 't':
+						PUTC(sj_context, '\t');
+						break;
+					case '/':
+						PUTC(sj_context, '/');
+						break;
+					case '\\':
+						PUTC(sj_context, '\\');
+						break;
+					case '\"':
+						PUTC(sj_context, '\"');
+						break;
+					default:
+						/* 发现非法转义字符 */
+						/* 将stack的top恢复 */
+						sj_context->top = head;
+						return SIMPLEJ_PARSE_INVALID_STRING_ESCAPE;
+				}
+				break;
 			case '\"':
-				set_simplejson_string(sj_value, sj_context->stack, sj_context->top);
+				/* 获取目前得到的字符总数 */
+				len = sj_context->top - head;
+				/* 设置value中的string内容 */
+				set_simplejson_string(sj_value, sj_context->stack, len);
+				/* 同时更新保存的字符串的地址,为了后续字符的处理 */
 				sj_context->json = tmp_str;
 				return SIMPLEJ_PARSE_OK;
 			case '\0':
-				sj_context->top = 0;
+				/* 恢复初始状态 */
+				sj_context->top = head;
 				return SIMPLEJ_PARSE_MISS_QUOTATION_MARK;
 			default:
+				/* 判断是否为非法字符 */
+				if ((unsigned char)current_ch < 0x20) {
+					sj_context->top = head;
+					return SIMPLEJ_PARSE_INVALID_STRING_CHAR;
+				}
 				PUTC(sj_context, current_ch);	
 		}
 	}
@@ -187,6 +246,8 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_value(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CON
 	}	
 }
 
+/* 通过context来保存一些临时状态信息,value来保存解析出来的信息 */
+/* 这样的好处是逻辑清晰,可以随时在结构体中添加新的字段满足需求 */
 SIMPLEJ_PARSE_RESULT simplejson_parse(SIMPLEJ_VALUE *sj_value, const char *input_str) {
 	int ret;
 	SIMPLEJ_CONTEXT sj_context;

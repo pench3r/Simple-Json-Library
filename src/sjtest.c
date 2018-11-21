@@ -24,6 +24,10 @@ static int testPassNum = 0;
 		}\
 	} while(0)
 
+/*
+	基本的调试宏,接收表达式和输出格式,可以在此基础上扩展各种类型的输出
+	功能和使用方法上都很容易进行各种扩展
+*/
 #define EXPECT_EQ_BASE(equality, expect, actual, format) \
 	do {\
 		testTotalNum++;\
@@ -34,11 +38,27 @@ static int testPassNum = 0;
 		}\
 	} while(0) 
 	
+/*
+	封装的整数调试宏
+*/
 #define EXPECT_EQ_INT(expect, actual) EXPECT_EQ_BASE((expect)==(actual), expect, actual, "%d")
 #define EXPECT_EQ_DOUBLE(expect, actual) EXPECT_EQ_BASE((expect)==(actual), expect, actual, "%g")
+/*
+	字符串类型比较特殊因为它的比较需要使用memcmp,这里就很好的凸显出基本调试宏的设计
+	同样可以传入%s的格式化字符进行输出
+*/
 #define EXPECT_EQ_STRING(expect, actual, len) \
 	EXPECT_EQ_BASE(sizeof(expect) -1 == len && memcmp(expect, actual, len) == 0, expect, actual, "%s")
+/*
+	通过接受1或0来判断输出错误信息
+*/
+#define EXPECT_TRUE(actual) EXPECT_EQ_BASE((actual) != 0, "true", "false", "%s")
+#define EXPECT_FALSE(actual) EXPECT_EQ_BASE((actual) != 1, "false", "true", "%s")
 
+/*
+	这里同样是基于基本调试宏,判断解析的结果(int)和解析出的数据类型(int)
+	都可以使用封装的整数调试宏,达到重用的效果
+*/
 #define CHECK_ERROR(expect_parse, expect_type, json) \
 	do {\
 		SIMPLEJ_VALUE sj_value;\
@@ -47,6 +67,9 @@ static int testPassNum = 0;
 		EXPECT_EQ_INT(expect_type, get_simplejson_type(&sj_value));\
 	} while(0)
 
+/*
+	唯一不同的在与最后判断解析出来的double的值的判断,使用封装的double调试宏
+*/
 #define CHECK_NUMBER(expect, json) \
 	do {\
 		SIMPLEJ_VALUE sj_value;\
@@ -56,6 +79,9 @@ static int testPassNum = 0;
 		EXPECT_EQ_DOUBLE(expect, get_simplejson_number(&sj_value));\
 	} while(0)
 
+/*
+	效果同上也是单独使用了封装的string调试宏,进行了string值的比较
+*/
 #define CHECK_STRING(expect, json) \
 	do {\
 		SIMPLEJ_VALUE sj_value;\
@@ -67,6 +93,20 @@ static int testPassNum = 0;
 
 static void test_parse_string() {
 	CHECK_STRING("hello", "\"hello\"");
+	CHECK_STRING("hello\nworld", "\"hello\\nworld\"");
+	CHECK_STRING("\" \\ / \b \f \n \r \t", "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\"");
+}
+
+static void test_parse_miss_quotation_mark() {
+	CHECK_ERROR(SIMPLEJ_PARSE_MISS_QUOTATION_MARK, SIMPLEJ_NULL, "\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_MISS_QUOTATION_MARK, SIMPLEJ_NULL, "\"h");
+}
+
+static void test_parse_invalid_string_escape() {
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_STRING_ESCAPE, SIMPLEJ_NULL, "\"\\v\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_STRING_ESCAPE, SIMPLEJ_NULL,"\"\\'\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_STRING_ESCAPE, SIMPLEJ_NULL, "\"\\0\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_STRING_ESCAPE, SIMPLEJ_NULL, "\"\\x12\"");
 }
 
 static void test_parse_number() {
@@ -111,21 +151,53 @@ static void test_parse_number() {
 }
 
 static void test_parse_null() {
+#if 0
 	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NULL, "null");
 	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NULL, " 	null");
 	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_NULL, " 	null 	");
+#endif
+	SIMPLEJ_VALUE sj_value;
+	sj_value.sj_type = SIMPLEJ_NULL;
+	set_simplejson_boolean(&sj_value, 0);
+	EXPECT_EQ_INT(SIMPLEJ_PARSE_OK, simplejson_parse(&sj_value, "null"));
+	EXPECT_EQ_INT(SIMPLEJ_NULL, get_simplejson_type(&sj_value));
+	sj_free(&sj_value);
 }
 
 static void test_parse_false() {
+#if 0
 	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_FALSE, "false");
 	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_FALSE, " 	false");
 	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_FALSE, " 	false 	");
+#endif
+	SIMPLEJ_VALUE sj_value;
+	sj_value.sj_type = SIMPLEJ_NULL;
+	set_simplejson_boolean(&sj_value, 0);
+	EXPECT_EQ_INT(SIMPLEJ_PARSE_OK, simplejson_parse(&sj_value, "false"));
+	EXPECT_EQ_INT(SIMPLEJ_FALSE, get_simplejson_type(&sj_value));
+	sj_free(&sj_value);
 }
 
 static void test_parse_true() {
+#if 0
 	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_TRUE, "true");
 	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_TRUE, " 	true");
 	CHECK_ERROR(SIMPLEJ_PARSE_OK, SIMPLEJ_TRUE, " 	true 	");
+#endif
+	SIMPLEJ_VALUE sj_value;
+	sj_value.sj_type = SIMPLEJ_NULL;
+	set_simplejson_boolean(&sj_value, 1);
+	EXPECT_EQ_INT(SIMPLEJ_PARSE_OK, simplejson_parse(&sj_value, "true"));
+	EXPECT_EQ_INT(SIMPLEJ_TRUE, get_simplejson_type(&sj_value));
+	sj_free(&sj_value);
+}
+
+static void test_access_boolean() {
+	SIMPLEJ_VALUE sj_value;
+	sj_value.sj_type = SIMPLEJ_NULL;
+	set_simplejson_boolean(&sj_value, 1);
+	EXPECT_TRUE(get_simplejson_boolean(&sj_value));
+	sj_free(&sj_value);
 }
 
 static void test_parse_expect_value() {
@@ -163,9 +235,12 @@ static void test_parse_number_too_big() {
 
 static void test_parse() {
 	test_parse_string();
+	test_parse_miss_quotation_mark();
+	test_parse_invalid_string_escape();
 	test_parse_null();
 	test_parse_false();
 	test_parse_true();
+	test_access_boolean();
 	test_parse_invalid_value();
 	test_parse_expect_value();
 	test_parse_root_not_singular();

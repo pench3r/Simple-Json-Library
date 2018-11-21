@@ -10,7 +10,9 @@ typedef enum {
 	SIMPLEJ_PARSE_INVALID_VALUE,
 	SIMPLEJ_PARSE_ROOT_NOT_SINGULAR,
 	SIMPLEJ_PARSE_NUMBER_TOO_BIG,
-	SIMPLEJ_PARSE_MISS_QUOTATION_MARK
+	SIMPLEJ_PARSE_MISS_QUOTATION_MARK,
+	SIMPLEJ_PARSE_INVALID_STRING_ESCAPE,
+	SIMPLEJ_PARSE_INVALID_STRING_CHAR
 } SIMPLEJ_PARSE_RESULT;
 
 /* error str type */
@@ -48,7 +50,7 @@ typedef struct {
 	size_t top, size;
 } SIMPLEJ_CONTEXT;
 
-const char *sj_parse_str[6];
+const char *sj_parse_str[8];
 const char *sj_type_str[7];
 
 /* parse function
@@ -63,6 +65,9 @@ SIMPLEJ_TYPE get_simplejson_type(const SIMPLEJ_VALUE *sj_value);
 
 /* get number */
 double get_simplejson_number(const SIMPLEJ_VALUE *sj_value);
+
+/* set number */
+void set_simplejson_number(SIMPLEJ_VALUE *sj_value, double value);
 
 /* get boolean */
 int get_simplejson_boolean(const SIMPLEJ_VALUE *sj_value);
