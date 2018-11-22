@@ -12,7 +12,10 @@ typedef enum {
 	SIMPLEJ_PARSE_NUMBER_TOO_BIG,
 	SIMPLEJ_PARSE_MISS_QUOTATION_MARK,
 	SIMPLEJ_PARSE_INVALID_STRING_ESCAPE,
-	SIMPLEJ_PARSE_INVALID_STRING_CHAR
+	SIMPLEJ_PARSE_INVALID_STRING_CHAR,
+	SIMPLEJ_PARSE_INVALID_UNICODE_HEX,
+	SIMPLEJ_PARSE_INVALID_UNICODE_SURROGATE,
+	SIMPLEJ_PARSE_MISS_COMMA_OR_SQUARE_BRACKET
 } SIMPLEJ_PARSE_RESULT;
 
 /* error str type */
@@ -35,13 +38,15 @@ typedef enum {
 } SIMPLEJ_TYPE;
 
 /* basic parse node struct */
-typedef struct {
+typedef struct SIMPLEJ_VALUE SIMPLEJ_VALUE;
+struct SIMPLEJ_VALUE{
 	union {
+		struct {SIMPLEJ_VALUE *element; size_t size;}a; /* array */
 		struct {char* s; size_t len;}s;	/* string */
 		double number;	/* number */
 	}u;
 	SIMPLEJ_TYPE sj_type;
-} SIMPLEJ_VALUE;
+};
 
 /* basic parse context struct */
 typedef struct {
@@ -84,6 +89,15 @@ size_t get_simplejson_string_length(const SIMPLEJ_VALUE *sj_value);
 /* set string */
 void set_simplejson_string(SIMPLEJ_VALUE *sj_value, const char* str, size_t len);
 
+/* get array size */
+size_t get_simplejson_array_size(const SIMPLEJ_VALUE *sj_value);
+
+/* get array element */
+SIMPLEJ_VALUE* get_simplejson_array_element(const SIMPLEJ_VALUE *sj_value, size_t index);
+
+/* set array */
+void set_simplejson_array(SIMPLEJ_VALUE *sj_value, SIMPLEJ_VALUE *src_value, size_t len);
+
 SIMPLEJ_PARSE_RESULT simplejson_parse_value(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context);
 
 SIMPLEJ_PARSE_RESULT simplejson_parse_literal(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context, const char *except, SIMPLEJ_TYPE type);
@@ -91,6 +105,8 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_literal(SIMPLEJ_VALUE *sj_value, SIMPLEJ_C
 SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context);
 
 SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context);
+
+SIMPLEJ_PARSE_RESULT simplejson_parse_array(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context);
 
 /* this argument can use some struct to store user input str address that easy to update input str */
 void strip_space(SIMPLEJ_CONTEXT *sj_context);

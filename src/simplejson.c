@@ -12,8 +12,12 @@
 #define IS_DIGIT1_9(ch) (((ch)>='1') && ((ch)<='9'))
 #define IS_DIGIT(ch) (((ch)>='0') && ((ch)<='9'))
 
-#define EXCEPT_CH(str,ch) do { assert(*str == ch); str++; } while(0)
+#define EXPECT_CH(str,ch) do { assert(*str == ch); str++; } while(0)
 #define PUTC(context, ch) do {*(char *)simplejson_context_push(context, sizeof(char)) = (ch);} while(0)
+#define PUT_SJ_VALUE(dest, value) \
+	do {\
+		memcpy(dest, value, sizeof(SIMPLEJ_VALUE));\
+	} while(0)
 
 
 const char *sj_parse_str[8] = {
@@ -50,6 +54,48 @@ static void * simplejson_context_push(SIMPLEJ_CONTEXT *sj_context, size_t size) 
 	sj_context->top += size;
 	return ret;
 }
+
+static void* simplejson_context_pop(SIMPLEJ_CONTEXT *sj_context, size_t size) {
+	assert(sj_context->top >= size);
+	return sj_context->stack + (sj_context->top -= size);
+}
+
+static const char* simplejson_parse_hex4(const char* str, unsigned* uval) {
+	char ch;
+	int i = 0;
+	*uval = 0;
+	for (i = 0; i < 4; ++i) {
+		ch = *str++;
+		*uval <<= 4;
+		if ( ch >= '0' && ch <= '9' ) *uval |= ch - '0';	
+		else if ( ch >= 'A' && ch <= 'F' ) *uval |= ch - ('A' - 10);
+		else if ( ch >= 'a' && ch <= 'f' ) *uval |= ch - ('a' - 10);
+		else return NULL;
+	}
+	return str;
+}
+
+static void simplejson_encode_utf8(SIMPLEJ_CONTEXT *sj_context, unsigned uval) {
+    if (uval <= 0x7F) 
+        PUTC(sj_context, uval & 0xFF);
+    else if (uval <= 0x7FF) {
+        PUTC(sj_context, 0xC0 | ((uval >> 6) & 0xFF));
+        PUTC(sj_context, 0x80 | ( uval       & 0x3F));
+    }
+    else if (uval <= 0xFFFF) {
+        PUTC(sj_context, 0xE0 | ((uval >> 12) & 0xFF));
+        PUTC(sj_context, 0x80 | ((uval >>  6) & 0x3F));
+        PUTC(sj_context, 0x80 | ( uval        & 0x3F));
+    }
+    else {
+        assert(uval <= 0x10FFFF);
+        PUTC(sj_context, 0xF0 | ((uval >> 18) & 0xFF));
+        PUTC(sj_context, 0x80 | ((uval >> 12) & 0x3F));
+        PUTC(sj_context, 0x80 | ((uval >>  6) & 0x3F));
+        PUTC(sj_context, 0x80 | ( uval        & 0x3F));
+    }
+}
+
 
 SIMPLEJ_TYPE get_simplejson_type(const SIMPLEJ_VALUE *sj_value) {
 	assert(sj_value != NULL);
@@ -103,13 +149,85 @@ void set_simplejson_string(SIMPLEJ_VALUE *sj_value, const char* str, size_t len)
 	sj_value->sj_type = SIMPLEJ_STRING;
 }
 
+size_t get_simplejson_array_size(const SIMPLEJ_VALUE *sj_value) {
+	assert(sj_value != NULL && sj_value->sj_type == SIMPLEJ_ARRAY);
+	return sj_value->u.a.size;
+}
+
+SIMPLEJ_VALUE* get_simplejson_array_element(const SIMPLEJ_VALUE *sj_value, size_t index) {
+	assert(sj_value != NULL && sj_value->sj_type == SIMPLEJ_ARRAY);
+	/* size_t 为非负整数类型 */
+	assert(sj_value->u.a.size);
+	return &sj_value->u.a.element[index];
+}
+
+void set_simplejson_array(SIMPLEJ_VALUE *sj_value, SIMPLEJ_VALUE *src_value, size_t len) {
+	assert(sj_value != NULL && src_value != NULL && len > 0);
+	/* 清空sj_value结构体 */
+	sj_free(sj_value);
+	/* 申请array存放的内容地址 */
+	sj_value->u.a.element = (SIMPLEJ_VALUE *)malloc(len);
+	/* copy */
+	memcpy(sj_value->u.a.element, src_value, len);
+	sj_value->u.a.size = len / sizeof(SIMPLEJ_VALUE);
+	sj_value->sj_type = SIMPLEJ_ARRAY; 
+}
+
+SIMPLEJ_PARSE_RESULT simplejson_parse_array(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context) {
+	size_t head = sj_context->top, len, index;
+	int result;
+	void *p;
+	EXPECT_CH(sj_context->json, '[');
+	strip_space(sj_context);	
+	if (*sj_context->json == ']') {
+		sj_context->json++;
+		sj_value->sj_type = SIMPLEJ_ARRAY;
+		sj_value->u.a.size = 0;
+		sj_value->u.a.element = NULL;
+		return SIMPLEJ_PARSE_OK;
+	}
+	for (;;) {
+		SIMPLEJ_VALUE tmp_value;
+		tmp_value.sj_type = SIMPLEJ_NULL;
+		if ((result = simplejson_parse_value(&tmp_value, sj_context)) != SIMPLEJ_PARSE_OK) {
+			break;
+		}
+		strip_space(sj_context);	
+		PUT_SJ_VALUE(simplejson_context_push(sj_context, sizeof(SIMPLEJ_VALUE)), &tmp_value);
+		if (*sj_context->json == ',') {
+			sj_context->json++;
+			strip_space(sj_context);	
+		} else if (*sj_context->json == ']') {
+			sj_context->json++;
+			len = sj_context->top - head;
+			p = simplejson_context_pop(sj_context, len);
+			set_simplejson_array(sj_value, (SIMPLEJ_VALUE *)p, len);
+			return SIMPLEJ_PARSE_OK;
+		} else {
+			result = SIMPLEJ_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
+			break;
+		}
+	}
+	/* 获取到已经压栈的value的字节数 */
+	len = sj_context->top - head;
+	/* 计算对应的value个数依次进行free */
+	len /= sizeof(SIMPLEJ_VALUE);
+	for (index=0; index<len; ++index) {
+		sj_free((SIMPLEJ_VALUE *)simplejson_context_pop(sj_context, sizeof(SIMPLEJ_VALUE)));
+	}
+	sj_context->top = head;
+	return result; 
+}
+
 SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context) {
 	/* 保存stack的top信息,用于回滚操作 */
 	size_t head = sj_context->top, len;
 	const char * tmp_str;
+	const char *tmp_pos;
 	char current_ch;
+	unsigned u1, u2;
 	tmp_str = sj_context->json;
-	EXCEPT_CH(tmp_str, '\"');	
+	EXPECT_CH(tmp_str, '\"');	
 	while (1) {
 		current_ch = *tmp_str++;
 		switch(current_ch) {
@@ -118,6 +236,23 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CO
 			case '\\':
 				current_ch = *tmp_str++;
 				switch(current_ch) {
+					case 'u':
+						tmp_pos = simplejson_parse_hex4(tmp_str, &u1);
+						if (tmp_pos == NULL) return SIMPLEJ_PARSE_INVALID_UNICODE_HEX;
+						/* 高位置的代理对 */
+						if ( u1 >= 0xD800 && u1 <= 0xDBFF ) {
+							if ( *tmp_pos++ != '\\' ) return SIMPLEJ_PARSE_INVALID_UNICODE_SURROGATE;
+							if ( *tmp_pos++ != 'u' ) return SIMPLEJ_PARSE_INVALID_UNICODE_SURROGATE; 
+							tmp_pos = simplejson_parse_hex4(tmp_pos, &u2);
+							if (tmp_pos == NULL) return SIMPLEJ_PARSE_INVALID_UNICODE_HEX;
+							if ( u2 < 0xDC00 || u2 > 0xdfff ) return SIMPLEJ_PARSE_INVALID_UNICODE_SURROGATE;
+							/* 计算对应的码点 */
+							u1 = (((u1 - 0xD800) << 10) | (u2 - 0xDC00)) + 0x10000;
+						}
+						/* 最后编码成为utf-8进行保存 */
+						simplejson_encode_utf8(sj_context, u1);
+						sj_context->json = tmp_pos;
+						break;
 					case 'b':
 						PUTC(sj_context, '\b');
 						break;
@@ -163,6 +298,7 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CO
 				return SIMPLEJ_PARSE_MISS_QUOTATION_MARK;
 			default:
 				/* 判断是否为非法字符 */
+				/* 这里的输入对于\x10为一个字符 */
 				if ((unsigned char)current_ch < 0x20) {
 					sj_context->top = head;
 					return SIMPLEJ_PARSE_INVALID_STRING_CHAR;
@@ -243,6 +379,7 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_value(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CON
 		case '\0': return SIMPLEJ_PARSE_EXPECT_VALUE;
 		default: return simplejson_parse_number(sj_value, sj_context);
 		case '"': return simplejson_parse_string(sj_value, sj_context); 
+		case '[': return simplejson_parse_array(sj_value, sj_context);
 	}	
 }
 
@@ -288,6 +425,10 @@ void sj_free(SIMPLEJ_VALUE *sj_value) {
   if (sj_value->sj_type == SIMPLEJ_STRING) {
     free(sj_value->u.s.s);  
   }
+	/* 当保存的为array时,free掉其申请的内容 */
+	if (sj_value->sj_type == SIMPLEJ_ARRAY) {
+		free(sj_value->u.a.element);
+	}
   sj_value->sj_type = SIMPLEJ_NULL;
 }
 

@@ -55,6 +55,8 @@ static int testPassNum = 0;
 #define EXPECT_TRUE(actual) EXPECT_EQ_BASE((actual) != 0, "true", "false", "%s")
 #define EXPECT_FALSE(actual) EXPECT_EQ_BASE((actual) != 1, "false", "true", "%s")
 
+#define EXPECT_EQ_SIZE_T(expect, actual) EXPECT_EQ_BASE((expect)==(actual), (size_t)expect, (size_t)actual, "%zu")
+
 /*
 	这里同样是基于基本调试宏,判断解析的结果(int)和解析出的数据类型(int)
 	都可以使用封装的整数调试宏,达到重用的效果
@@ -91,6 +93,22 @@ static int testPassNum = 0;
 		EXPECT_EQ_STRING(expect, get_simplejson_string(&sj_value), get_simplejson_string_length(&sj_value));\
 	} while(0)
 
+#define CHECK_ARRAY(expect, json) \
+	do {\
+		SIMPLEJ_VALUE sj_value;\
+		sj_value.sj_type = SIMPLEJ_NULL;\
+		EXPECT_EQ_INT(SIMPLEJ_PARSE_OK, simplejson_parse(&sj_value,json));\
+		EXPECT_EQ_INT(SIMPLEJ_ARRAY, get_simplejson_type(&sj_value));\
+		EXPECT_EQ_SIZE_T(expect, get_simplejson_array_size(&sj_value));\
+		sj_free(&sj_value);\
+	} while(0)
+
+static void test_parse_array() {
+	CHECK_ARRAY(0, "[ ]");
+	CHECK_ARRAY(5, "[ null , false , true , 123 , \"abc\" ]");
+	CHECK_ARRAY(4, "[ [ ] , [ 0 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]");
+}
+
 static void test_parse_string() {
 	CHECK_STRING("hello", "\"hello\"");
 	CHECK_STRING("hello\nworld", "\"hello\\nworld\"");
@@ -107,6 +125,32 @@ static void test_parse_invalid_string_escape() {
 	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_STRING_ESCAPE, SIMPLEJ_NULL,"\"\\'\"");
 	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_STRING_ESCAPE, SIMPLEJ_NULL, "\"\\0\"");
 	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_STRING_ESCAPE, SIMPLEJ_NULL, "\"\\x12\"");
+}
+
+static void test_parse_invalid_string_char() {
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_STRING_CHAR, SIMPLEJ_NULL, "\"\x01\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_STRING_CHAR, SIMPLEJ_NULL, "\"\x1f\"");
+}
+
+static void test_parse_invalid_unicode_hex() {
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_HEX, SIMPLEJ_NULL, "\"\\u\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_HEX, SIMPLEJ_NULL, "\"\\u0\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_HEX, SIMPLEJ_NULL, "\"\\u01\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_HEX, SIMPLEJ_NULL, "\"\\u012\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_HEX, SIMPLEJ_NULL, "\"\\u/000\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_HEX, SIMPLEJ_NULL, "\"\\uG000\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_HEX, SIMPLEJ_NULL, "\"\\u0/00\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_HEX, SIMPLEJ_NULL, "\"\\u00G0\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_HEX, SIMPLEJ_NULL, "\"\\u000/\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_HEX, SIMPLEJ_NULL, "\"\\u000G\"");
+}
+
+static void test_parse_invalid_unicode_surrogate() {
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_SURROGATE, SIMPLEJ_NULL, "\"\\uD800\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_SURROGATE, SIMPLEJ_NULL, "\"\\uDBFF\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_SURROGATE, SIMPLEJ_NULL, "\"\\uD800\\\\\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_SURROGATE, SIMPLEJ_NULL, "\"\\uD800\\uDBFF\"");
+	CHECK_ERROR(SIMPLEJ_PARSE_INVALID_UNICODE_SURROGATE, SIMPLEJ_NULL, "\"\\uD800\\uE000\"");
 }
 
 static void test_parse_number() {
@@ -234,9 +278,13 @@ static void test_parse_number_too_big() {
 		
 
 static void test_parse() {
+	test_parse_array();
 	test_parse_string();
 	test_parse_miss_quotation_mark();
 	test_parse_invalid_string_escape();
+	test_parse_invalid_string_char();
+	test_parse_invalid_unicode_hex();
+	test_parse_invalid_unicode_surrogate();
 	test_parse_null();
 	test_parse_false();
 	test_parse_true();
