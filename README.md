@@ -81,7 +81,32 @@ string是由双引号所包围的,在测试的时候传入json测试字符串时
 
 新增的解析错误类型: `SIMPLEJ_PARSE_INVALID_STRING_CHAR`、`SIMPLEJ_PARSE_INVALID_MISS_QUOTATION_MARK`、`SIMPLEJ_PARSE_INVALID_ESCAPE`.
 
+### 解析JSON数组语法
+
+JSON数组是一种复合类型的结构,语法如下:
+
+	array = %x5B ws [ value *( ws %x2C ws value ) ] ws %x5D
+
+包含的value为null、false、true、string、number、array等类型,每个value以`,`间隔;
+
+首先了解我们如何去解析和保存array.这里依然使用解析string时使用的动态栈,由于array中的每个元素都是可以使用`SIMPLEJ_VALUE`来保存,因此在解析的过程中使用stack(这里使用`simplejson_context_push`来进行保存,函数的定义可以满足任何类型数据的保存,以为需要自己传入`len`这样的设计复用性很高)来依次保存解析出来的每个`SIMPLEJ_VALUE`;在保存的时候根据解析出来的`VALUE`个数再去动态创建`SIMPLEJ_VALUE`数组,这样就节省空间以及提升效率;
+
+涉及的数据结构:
+
+typedef struct {
+	union {
+		struct { SIMPLEJ_VALUE *element; size_t size;}a;
+		struct { char* s; size_t len;}s;
+		double number;
+	}u;
+}
+
+对于`context`中的结构不需要变动即可满足需求,在解析array时使用递归的方式调用`simplejson_parse_value`来识别各种类型的值.
+
+错误类型添加了: `SIMPLEJ_PARSE_MISS_COMMA_OR_SQUARE_BRACKET`
+
 ### 中间遇到的一些问题
 
-- 在宏中想尝试根据不同的type来返回不同的字符串,这时由于参数的类型不固定,导致编译不通过,必须通过强制类型转换才能保证编译通过,因为C是强类型的语言
-- 在解析字符串时,最后需要使用utf8的编码函数将对应的码点解析成相应的十六进制然后每个字节再进行保存
+- 在宏中想尝试根据不同的`type`来返回不同的字符串,这时由于参数的类型不固定,导致编译不通过,必须通过强制类型转换才能保证编译通过,因为C是强类型的语言
+- 在解析字符串时,最后需要使用`utf8`的编码函数将对应的码点解析成相应的十六进制然后每个字节再进行保存
+- 在调试array中碰到的一个`bug`,解析`string`时,在调用`set_simplejson_string`时引用的参数地址没有符合函数的需求,导致在`test`时出现了诡异的错误

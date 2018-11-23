@@ -93,24 +93,37 @@ static int testPassNum = 0;
 		EXPECT_EQ_STRING(expect, get_simplejson_string(&sj_value), get_simplejson_string_length(&sj_value));\
 	} while(0)
 
-#define CHECK_ARRAY(expect, json) \
+/*
+	这里需要在添加一个sj_value的参数可以在外面进行array元素的访问
+*/
+#define CHECK_ARRAY(sj_value, expect, json) \
 	do {\
-		SIMPLEJ_VALUE sj_value;\
-		sj_value.sj_type = SIMPLEJ_NULL;\
-		EXPECT_EQ_INT(SIMPLEJ_PARSE_OK, simplejson_parse(&sj_value,json));\
-		EXPECT_EQ_INT(SIMPLEJ_ARRAY, get_simplejson_type(&sj_value));\
-		EXPECT_EQ_SIZE_T(expect, get_simplejson_array_size(&sj_value));\
-		sj_free(&sj_value);\
+		EXPECT_EQ_INT(SIMPLEJ_PARSE_OK, simplejson_parse(sj_value,json));\
+		EXPECT_EQ_INT(SIMPLEJ_ARRAY, get_simplejson_type(sj_value));\
+		EXPECT_EQ_SIZE_T(expect, get_simplejson_array_size(sj_value));\
 	} while(0)
 
 static void test_parse_array() {
-	CHECK_ARRAY(0, "[ ]");
-	CHECK_ARRAY(5, "[ null , false , true , 123 , \"abc\" ]");
-	CHECK_ARRAY(4, "[ [ ] , [ 0 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]");
+	SIMPLEJ_VALUE sj_value;
+	sj_value.sj_type = SIMPLEJ_NULL;
+#if 0
+	CHECK_ARRAY(&sj_value, 0, "[ ]");
+	sj_free(&sj_value);
+#endif
+	CHECK_ARRAY(&sj_value, 5, "[ null , false , true , 123 , \"abc\" ]");
+	EXPECT_EQ_INT(SIMPLEJ_NULL, get_simplejson_type(get_simplejson_array_element(&sj_value, 0)));
+	EXPECT_EQ_INT(SIMPLEJ_FALSE, get_simplejson_type(get_simplejson_array_element(&sj_value, 1)));
+	EXPECT_EQ_INT(SIMPLEJ_TRUE, get_simplejson_type(get_simplejson_array_element(&sj_value, 2)));
+	EXPECT_EQ_INT(SIMPLEJ_NUMBER, get_simplejson_type(get_simplejson_array_element(&sj_value, 3)));
+	EXPECT_EQ_INT(SIMPLEJ_STRING, get_simplejson_type(get_simplejson_array_element(&sj_value, 4)));
+	sj_free(&sj_value);
+	CHECK_ARRAY(&sj_value, 4, "[ [ ] , [ 0 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]");
+	sj_free(&sj_value);
 }
 
 static void test_parse_string() {
 	CHECK_STRING("hello", "\"hello\"");
+	CHECK_STRING("123", "\"123\"");
 	CHECK_STRING("hello\nworld", "\"hello\\nworld\"");
 	CHECK_STRING("\" \\ / \b \f \n \r \t", "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\"");
 }

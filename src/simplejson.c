@@ -157,7 +157,7 @@ size_t get_simplejson_array_size(const SIMPLEJ_VALUE *sj_value) {
 SIMPLEJ_VALUE* get_simplejson_array_element(const SIMPLEJ_VALUE *sj_value, size_t index) {
 	assert(sj_value != NULL && sj_value->sj_type == SIMPLEJ_ARRAY);
 	/* size_t 为非负整数类型 */
-	assert(sj_value->u.a.size);
+	assert(sj_value->u.a.size > index);
 	return &sj_value->u.a.element[index];
 }
 
@@ -288,7 +288,8 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CO
 				/* 获取目前得到的字符总数 */
 				len = sj_context->top - head;
 				/* 设置value中的string内容 */
-				set_simplejson_string(sj_value, sj_context->stack, len);
+				/* 这里之前存在一个BUG,只有在特定的条件下才能触发 */
+				set_simplejson_string(sj_value, simplejson_context_pop(sj_context, len), len);
 				/* 同时更新保存的字符串的地址,为了后续字符的处理 */
 				sj_context->json = tmp_str;
 				return SIMPLEJ_PARSE_OK;
