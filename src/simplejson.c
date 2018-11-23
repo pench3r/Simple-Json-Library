@@ -18,6 +18,10 @@
 	do {\
 		memcpy(dest, value, sizeof(SIMPLEJ_VALUE));\
 	} while(0)
+#define PUT_SJ_MEMBER(dest, value) \
+	do {\
+		memcpy(dest, value, sizeof(SIMPLEJ_MEMBER));\
+	} while(0)
 
 
 const char *sj_parse_str[8] = {
@@ -395,6 +399,66 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CO
 }
 
 SIMPLEJ_PARSE_RESULT simplejson_parse_value(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context) {
+	SIMPLEJ_PARSE_RESULT ret;
+	size_t head = sj_context->top;
+	EXPECT(sj_context->json, '{');
+	strip_space(sj_context);
+	/* 首先解析为空的情况 */
+	if (*sj_context->json == '}') {
+		sj_context->json++;
+		sj_value.sj_type = SIMPLEJ_OBJECT;
+		return SIMPLEJ_PARSE_OK;		
+	}
+	for (;;) {
+		char *keyStr;
+		size_t keyLen;
+		/* 用以保存object中的每个成员 */
+		SIMPLEJ_MEMBER sj_member;
+		SIMPLEJ_VALUE tmp_value;
+		tmp_value.sj_type = SIMPLEJ_NULL;
+		/* 处理"{1:1,"情况 */
+		if (*sj_context->json == '\0') {
+			ret = SIMPLEJ_PARSE_MISS_KEY;
+			break;
+		}
+		/* 第一部分先解析key部分,并保存到member结构体中 */
+		if ((ret = simplejson_parse_string_raw(sj_context, &keyStr, &keyLen)) != SIMPLEJ_PARSE_OK) {
+			break;
+		}	
+		sj_member.key = (char *)malloc(keyLen+1);
+		sj_member.key[keyLen] = '\0';
+		sj_member.klen = keyLen;
+		memcpy(sj_member.key, keyStr, keyLen);
+		strip_space(sj_context);
+		if (*sj_context->json != ':') {
+			return SIMPLEJ_PARSE_MISS_COLON;
+		}
+		sj_context->json++;
+		strip_space(sj_context);
+		/* 第二部分解析value部分 */
+		if ((ret = simplejson_parse_value(&tmp_value, sj_context)) != SIMPLEJ_PARSE_OK) {
+			break;
+		}
+		/* 保存value */
+		memcpy(&sj_member.val, &tmp_value, sizeof(SIMPLEJ_VALUE));
+		/* 将member压栈保存 */
+		PUT_SJ_MEMBER(simplejson_context_push(sj_context, sizeof(SIMPLEJ_MEMBER)), &sj_member);
+		strip_space(sj_context);
+		if ( *sj_context->json == '}' ) {
+			sj_context->json++;
+			return SIMPLEJ_PARSE_OK;
+		}
+		if ( *sj_context->json != ',' || *sj_context->json == '\0') {
+			ret = SIMPLEJ_PARSE_MISS_COMMA_OR_CURLY_BRACKET;
+			break;
+		}
+		sj_context->json++;
+		strip_space(sj_context);
+	}
+	return ret;
+}
+
+SIMPLEJ_PARSE_RESULT simplejson_parse_value(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context) {
 	char first_char = *(sj_context->json);
 	switch(first_char) {
 		case 'n': return simplejson_parse_literal(sj_value, sj_context, "null", SIMPLEJ_NULL);
@@ -404,6 +468,7 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_value(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CON
 		default: return simplejson_parse_number(sj_value, sj_context);
 		case '"': return simplejson_parse_string(sj_value, sj_context); 
 		case '[': return simplejson_parse_array(sj_value, sj_context);
+		case '{': return simplejson_parse_object(sj_value, sj_context);
 	}	
 }
 

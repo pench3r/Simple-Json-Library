@@ -15,7 +15,10 @@ typedef enum {
 	SIMPLEJ_PARSE_INVALID_STRING_CHAR,
 	SIMPLEJ_PARSE_INVALID_UNICODE_HEX,
 	SIMPLEJ_PARSE_INVALID_UNICODE_SURROGATE,
-	SIMPLEJ_PARSE_MISS_COMMA_OR_SQUARE_BRACKET
+	SIMPLEJ_PARSE_MISS_COMMA_OR_SQUARE_BRACKET,
+	SIMPLEJ_PARSE_MISS_KEY,
+	SIMPLEJ_PARSE_MISS_COLON,
+	SIMPLEJ_PARSE_MISS_COMMA_OR_CURLY_BRACKET
 } SIMPLEJ_PARSE_RESULT;
 
 /* error str type */
@@ -118,6 +121,8 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CO
 SIMPLEJ_PARSE_RESULT simplejson_parse_string_raw(SIMPLEJ_CONTEXT *sj_context, char **outStr, size_t *outLen);
 
 SIMPLEJ_PARSE_RESULT simplejson_parse_array(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context);
+
+SIMPLEJ_PARSE_RESULT simplejson_parse_object(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context);
 
 /* this argument can use some struct to store user input str address that easy to update input str */
 void strip_space(SIMPLEJ_CONTEXT *sj_context);
