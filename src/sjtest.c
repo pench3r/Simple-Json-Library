@@ -91,6 +91,7 @@ static int testPassNum = 0;
 		EXPECT_EQ_INT(SIMPLEJ_PARSE_OK, simplejson_parse(&sj_value,json));\
 		EXPECT_EQ_INT(SIMPLEJ_STRING, get_simplejson_type(&sj_value));\
 		EXPECT_EQ_STRING(expect, get_simplejson_string(&sj_value), get_simplejson_string_length(&sj_value));\
+		sj_free(&sj_value);\
 	} while(0)
 
 /*

@@ -202,6 +202,10 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_array(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CON
 			len = sj_context->top - head;
 			p = simplejson_context_pop(sj_context, len);
 			set_simplejson_array(sj_value, (SIMPLEJ_VALUE *)p, len);
+			/* 这里需要再处理一下遗留在stack上的SIMPLEJ_VALUE结构体 */
+			for (index=0; index<len/sizeof(SIMPLEJ_VALUE); ++index) {
+				sj_free((SIMPLEJ_VALUE *)p+index);
+			}
 			return SIMPLEJ_PARSE_OK;
 		} else {
 			result = SIMPLEJ_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
@@ -212,6 +216,8 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_array(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CON
 	len = sj_context->top - head;
 	/* 计算对应的value个数依次进行free */
 	len /= sizeof(SIMPLEJ_VALUE);
+	/* 当解析失败时,需要处理遗留在stack上的结构体 */
+	/* 并且将他们弹出stack */
 	for (index=0; index<len; ++index) {
 		sj_free((SIMPLEJ_VALUE *)simplejson_context_pop(sj_context, sizeof(SIMPLEJ_VALUE)));
 	}
@@ -220,6 +226,21 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_array(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CON
 }
 
 SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context) {
+	size_t recvLen;
+	char *recvStr;
+	SIMPLEJ_PARSE_RESULT ret;
+	if ((ret = simplejson_parse_string_raw(sj_context, &recvStr, &recvLen)) == SIMPLEJ_PARSE_OK) {
+		set_simplejson_string(sj_value, recvStr, recvLen);	
+	}
+	return ret;
+}
+
+/* 
+	对string解析函数进行重构,发现该函数对于sj_value参数的依赖
+	只有针对set_string时才会进行sj_value的操作,因此思路将解析字符串的功能
+	和set_string的功能分开,这样就可以在解析object中使用解析key
+*/
+SIMPLEJ_PARSE_RESULT simplejson_parse_string_raw(SIMPLEJ_CONTEXT *sj_context, char **outStr, size_t *outLen) {
 	/* 保存stack的top信息,用于回滚操作 */
 	size_t head = sj_context->top, len;
 	const char * tmp_str;
@@ -289,7 +310,9 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CO
 				len = sj_context->top - head;
 				/* 设置value中的string内容 */
 				/* 这里之前存在一个BUG,只有在特定的条件下才能触发 */
-				set_simplejson_string(sj_value, simplejson_context_pop(sj_context, len), len);
+				/* set_simplejson_string(sj_value, simplejson_context_pop(sj_context, len), len); */
+				*outStr = simplejson_context_pop(sj_context, len);
+				*outLen = len;
 				/* 同时更新保存的字符串的地址,为了后续字符的处理 */
 				sj_context->json = tmp_str;
 				return SIMPLEJ_PARSE_OK;
@@ -400,6 +423,8 @@ SIMPLEJ_PARSE_RESULT simplejson_parse(SIMPLEJ_VALUE *sj_value, const char *input
 			ret = SIMPLEJ_PARSE_ROOT_NOT_SINGULAR;
 		}
 	}
+	/* 回收内存 */
+	free(sj_context.stack);
 	return ret;
 }
 
@@ -427,6 +452,7 @@ void sj_free(SIMPLEJ_VALUE *sj_value) {
     free(sj_value->u.s.s);  
   }
 	/* 当保存的为array时,free掉其申请的内容 */
+	/* 因为这里保存的SIMPLEJ_VALUE都是值复制 */
 	if (sj_value->sj_type == SIMPLEJ_ARRAY) {
 		free(sj_value->u.a.element);
 	}

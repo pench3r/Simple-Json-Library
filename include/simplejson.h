@@ -39,13 +39,22 @@ typedef enum {
 
 /* basic parse node struct */
 typedef struct SIMPLEJ_VALUE SIMPLEJ_VALUE;
+typedef struct SIMPLEJ_MEMBER SIMPLEJ_MEMBER;
+
 struct SIMPLEJ_VALUE{
 	union {
+		struct {SIMPLEJ_MEMBER *member; size_t size;}o; /* object */
 		struct {SIMPLEJ_VALUE *element; size_t size;}a; /* array */
 		struct {char* s; size_t len;}s;	/* string */
 		double number;	/* number */
 	}u;
 	SIMPLEJ_TYPE sj_type;
+};
+
+struct SIMPLEJ_MEMBER {
+	char *key;
+	size_t klen;
+	SIMPLEJ_VALUE val;
 };
 
 /* basic parse context struct */
@@ -105,6 +114,8 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_literal(SIMPLEJ_VALUE *sj_value, SIMPLEJ_C
 SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context);
 
 SIMPLEJ_PARSE_RESULT simplejson_parse_string(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context);
+
+SIMPLEJ_PARSE_RESULT simplejson_parse_string_raw(SIMPLEJ_CONTEXT *sj_context, char **outStr, size_t *outLen);
 
 SIMPLEJ_PARSE_RESULT simplejson_parse_array(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context);
 

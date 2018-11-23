@@ -81,7 +81,7 @@ string是由双引号所包围的,在测试的时候传入json测试字符串时
 
 新增的解析错误类型: `SIMPLEJ_PARSE_INVALID_STRING_CHAR`、`SIMPLEJ_PARSE_INVALID_MISS_QUOTATION_MARK`、`SIMPLEJ_PARSE_INVALID_ESCAPE`.
 
-### 解析JSON数组语法
+### 4. 解析JSON数组语法
 
 JSON数组是一种复合类型的结构,语法如下:
 
@@ -105,8 +105,35 @@ typedef struct {
 
 错误类型添加了: `SIMPLEJ_PARSE_MISS_COMMA_OR_SQUARE_BRACKET`
 
+### 5. 解析object语法
+
+object主要是由`{`和`}`进行包围的键值对,键为字符串,值为之前对应的各种类型,语法如下:
+
+	member = string ws %x3A ws value
+	object = %x7B ws [ member *( ws %x2C ws member ) ] ws %x7D
+
+这里解析的思路与数组相同,也是在解析的过程以每个`member`进行解析,分为两部分先解析key的字符串,接着解析对应的value并判断是否以`:`为间隔符;
+
+相关的数据结构:
+
+	struct SIMPLEJ_VALUE {
+		union {
+			struct {SIMPLEJ_MEMBER *member; size_t size;}o;
+			...	
+		}u;
+		...
+	};
+	
+	stuct SIMPLEJ_MEMBER {
+		char *key; size_t klen;
+		SIMPLEJ_VALUE value;
+	}
+
+添加的错误类型: `SIMPLEJ_PARSE_MISS_KEY`、`SIMPLEJ_PARSE_MISS_COLON`、`SIMPLEJ_PARSE_MISS_COMMA_OR_CURLY_BRACKET`
+
 ### 中间遇到的一些问题
 
 - 在宏中想尝试根据不同的`type`来返回不同的字符串,这时由于参数的类型不固定,导致编译不通过,必须通过强制类型转换才能保证编译通过,因为C是强类型的语言
 - 在解析字符串时,最后需要使用`utf8`的编码函数将对应的码点解析成相应的十六进制然后每个字节再进行保存
 - 在调试array中碰到的一个`bug`,解析`string`时,在调用`set_simplejson_string`时引用的参数地址没有符合函数的需求,导致在`test`时出现了诡异的错误
+- 只有c99以上的标准才支持`size_t`的格式化字符输出`%zu`
