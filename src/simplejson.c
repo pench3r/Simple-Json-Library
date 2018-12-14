@@ -398,15 +398,15 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_number(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CO
 	return SIMPLEJ_PARSE_INVALID_VALUE;
 }
 
-SIMPLEJ_PARSE_RESULT simplejson_parse_value(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context) {
+SIMPLEJ_PARSE_RESULT simplejson_parse_object(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CONTEXT *sj_context) {
 	SIMPLEJ_PARSE_RESULT ret;
 	size_t head = sj_context->top;
-	EXPECT(sj_context->json, '{');
+	EXPECT_CH(sj_context->json, '{');
 	strip_space(sj_context);
 	/* 首先解析为空的情况 */
 	if (*sj_context->json == '}') {
 		sj_context->json++;
-		sj_value.sj_type = SIMPLEJ_OBJECT;
+		sj_value->sj_type = SIMPLEJ_OBJECT;
 		return SIMPLEJ_PARSE_OK;		
 	}
 	for (;;) {
