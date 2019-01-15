@@ -107,7 +107,7 @@ static int testPassNum = 0;
 static void test_parse_array() {
 	SIMPLEJ_VALUE sj_value;
 	sj_value.sj_type = SIMPLEJ_NULL;
-#if 0
+#if 1
 	CHECK_ARRAY(&sj_value, 0, "[ ]");
 	sj_free(&sj_value);
 #endif
@@ -120,6 +120,22 @@ static void test_parse_array() {
 	sj_free(&sj_value);
 	CHECK_ARRAY(&sj_value, 4, "[ [ ] , [ 0 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]");
 	sj_free(&sj_value);
+
+	EXPECT_EQ_INT(SIMPLEJ_PARSE_OK, simplejson_parse(&sj_value, "[ [ ] , [ 123 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]"));
+	EXPECT_EQ_INT(SIMPLEJ_ARRAY, get_simplejson_type(&sj_value));
+	EXPECT_EQ_SIZE_T(4, get_simplejson_array_size(&sj_value));
+	for (int i=0; i<4; ++i) {
+		SIMPLEJ_VALUE *tmp_sj_value = get_simplejson_array_element(&sj_value, i);
+		EXPECT_EQ_INT(SIMPLEJ_ARRAY, get_simplejson_type(tmp_sj_value));
+		EXPECT_EQ_SIZE_T(i, get_simplejson_array_size(tmp_sj_value));
+		for (int j=0; j<i; ++j) {
+			SIMPLEJ_VALUE *value = get_simplejson_array_element(tmp_sj_value, j);
+			if (i == 1) {
+				printf("element index: %d, type: %d\n", j, get_simplejson_type(value));
+			}
+			EXPECT_EQ_INT(SIMPLEJ_NUMBER, get_simplejson_type(value));
+		}
+	}
 }
 
 static void test_parse_string() {
