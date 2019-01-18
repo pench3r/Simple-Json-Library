@@ -207,9 +207,12 @@ SIMPLEJ_PARSE_RESULT simplejson_parse_array(SIMPLEJ_VALUE *sj_value, SIMPLEJ_CON
 			p = simplejson_context_pop(sj_context, len);
 			set_simplejson_array(sj_value, (SIMPLEJ_VALUE *)p, len);
 			/* 这里需要再处理一下遗留在stack上的SIMPLEJ_VALUE结构体 */
-			for (index=0; index<len/sizeof(SIMPLEJ_VALUE); ++index) {
+			/* 这里存在一个BUG，由于stack上面我保存的并非是指针 */
+			/* 这里进行free导致了非预期性的执行错误 */
+			/* for (index=0; index<len/sizeof(SIMPLEJ_VALUE); ++index) {
 				sj_free((SIMPLEJ_VALUE *)p+index);
 			}
+			*/
 			return SIMPLEJ_PARSE_OK;
 		} else {
 			result = SIMPLEJ_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
@@ -518,6 +521,7 @@ void sj_free(SIMPLEJ_VALUE *sj_value) {
   }
 	/* 当保存的为array时,free掉其申请的内容 */
 	/* 因为这里保存的SIMPLEJ_VALUE都是值复制 */
+	/* 函数这里存在内存泄漏，需要解决嵌套数组中的申请的内存回收问题 */
 	if (sj_value->sj_type == SIMPLEJ_ARRAY) {
 		free(sj_value->u.a.element);
 	}
